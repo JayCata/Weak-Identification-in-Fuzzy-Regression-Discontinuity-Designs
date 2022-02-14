@@ -1,0 +1,79 @@
+---
+title: "WFRD package Rundown"
+output: html_notebook
+---
+WFRD is the package name. You may have to open the project in the WFRD folder (WFRD.Rproj), install "devtools" if you haven't already, and run "devtools::install()." If this works, it should end with "something like "DONE(WFRD)." We also load rdrobust since we are using it in this file, but it shouldn't be necesarry if we aren't.
+```{r}
+# Load Packages
+rm(list = ls())
+library(WFRD)
+library(rdrobust)
+```
+
+These are the simulated data parameters. They come straight from the old MatLab code. 
+```{r}
+n <- 10000
+
+
+sigma1 <- 1
+sigma2 <- 1
+rho <- .99
+
+Q <- matrix(c(sigma1, rho, rho, sigma2), 2, 2)
+D <- chol(Q)
+
+beta <- 5
+c <- 5
+z0 <- 0
+rate <- -.210
+h <- n^rate
+```
+
+Here is the simulated data as a matrix. This should work with dataframe formatted data. 
+```{r}
+
+Z <- matrix(rnorm(n, mean = 0, sd = 1), n, 1)
+W <- matrix(rnorm(2*n, mean = 0, sd = 1), n, 2)
+W <- W %*% D
+eps <- matrix(rnorm(n, mean = 0, sd = 1), n, 1)
+alpha <- (W[, 1])
+u <- (W[, 2])
+X <- matrix((u < 0) * (Z<=z0) + (u < c) * (Z > z0))
+Y <- matrix(alpha + X %*% beta + eps)
+```
+
+
+Here we are running the rdrobust package to compare SEs.
+```{r}
+result_rdrobust <- rdrobust(Y, Z, c = z0, fuzzy = X, vce = "hc0",  kernel = "tri")
+```
+
+This is just a single result from package. If bandwidth is specified, the kernel must be as well. The kernel can be specified without a bandwidth and rdrobus can find the appropriate bandwidth.
+```{r}
+Results <- WFRD(Y, X, Z, threshold = 0, stand_inf = TRUE, kernel = "Triangular")
+```
+
+Compare SE of rdrobust and our method. When comparing, make sure that the inputs match (kernel, bandwidths, or the lack of bandwidth/both).
+```{r}
+options(digits=20)
+print(Results["SE_Std"])
+print(result_rdrobust[["se"]][1])
+
+```
+
+This is the plotting option that I prefer. Test it out with multiple values of c. This cannot be used without having both the bandwidths and kernel specified. This currently doesn't plot the standard inference intervals, but that is likely possible. 
+```{r}
+standard_rate <- n ^ -.210
+subtractors <- seq(-.05, 1, length.out = 10)
+bandwidths <- standard_rate + subtractors
+results <- WFRD_multiple_bw_alt(Y, X, Z, threshold = 0, bandwidths = bandwidths,  kernel = "Triangular")
+```
+
+This is the other plotting option. It can look very bad when switching between Confidence set types but looks fine when they are consistent. This one can plot the standard inference method too. 
+```{r}
+bandwidths <- standard_rate + subtractors
+results <- WFRD_multiple_bw(Y, X, Z, threshold = 0, bandwidths = bandwidths,  kernel = "Triangular")
+```
+
+
+

@@ -9,10 +9,11 @@ Description: This package esitmates Fuzzy Regresison Discontinuity and provides 
 License: MIT + file LICENSE
 Imports:
         foreign,
-        tidyverse,
-	      rdrobust,
-	      pracma,
-	      cowplot
+        ggplot2,
+	dplyr,
+	rdrobust,
+	pracma,
+	cowplot
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)

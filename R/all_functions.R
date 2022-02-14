@@ -1,6 +1,7 @@
 # Kernel Functions
 #' @import cowplot
-#' @import tidyverse
+#' @import dplyr
+#' @import ggplot2
 #' @import foreign
 #' @import rdrobust
 #' @import pracma
