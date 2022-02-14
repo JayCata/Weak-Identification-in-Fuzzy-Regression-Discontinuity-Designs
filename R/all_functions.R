@@ -1,6 +1,12 @@
 # Kernel Functions
+#' @import cowplot
+#' @import tidyverse
+#' @import foreign
+#' @import rdrobust
+#' @import pracma
 
-#' Uniform Kernel Function
+
+# Uniform Kernel Function
 Uniform_Kern <- function(Z, z0, h, return_k = FALSE){
   out <- 1/2 * (((Z-z0)/h) >= -1) * (((Z-z0)/h) <= 1)
   if (return_k){
@@ -8,7 +14,7 @@ Uniform_Kern <- function(Z, z0, h, return_k = FALSE){
   }
   return(out)
 }
-#' Triangular Kernel Function
+# Triangular Kernel Function
 Triangular_Kern <- function(Z, z0, h, return_k = FALSE){
   out <- (1 - abs((Z-z0)/h)) * (((Z-z0)/h) >= -1) * (((Z-z0)/h) <= 1)
   if (return_k){
@@ -16,7 +22,7 @@ Triangular_Kern <- function(Z, z0, h, return_k = FALSE){
   }
   return(out)
 }
-#' Epanechnikov Kernel Function
+# Epanechnikov Kernel Function
 Epanechnikov_Kern <- function(Z, z0, h, return_k = FALSE){
   out <- (3/4) * (1 - ((Z-z0)/h)**2) * (((Z-z0)/h) >= -1) * (((Z-z0)/h) <= 1)
   if (return_k){
@@ -24,12 +30,12 @@ Epanechnikov_Kern <- function(Z, z0, h, return_k = FALSE){
   }
   return(out)
 }
-#' Gaussian Kernel Function
+# Gaussian Kernel Function
 Gaussian_Kern <- function(Z, z0, h){
   exponent <- -(1/2) * ((Z-z0)/h) ^ 2
   Ker <- (1/sqrt(2 * pi)) * exp(exponent)
 }
-#' Silverman Kernel Function
+# Silverman Kernel Function
 Silverman_Kern <- function(Z, z0, h){
   u <- (Z-z0)/h
   first_term <- (1/2) * exp(-abs(u)/sqrt(2))
@@ -60,15 +66,7 @@ var_thresh <- function(e_1, e_2, Z, K){
   return((tail_term %*% middle_term %*% tail_term)[[1,1]])
 }
 
-#' # Returns DY, DX, VY, VX, CovXY, V in dictionary form
-#' @param Y Dependent Variable
-#' @param X Treatment Status
-#' @param Z running variable
-#' @param z0 cutoff
-#' @param h bandwidth
-#' @param kerfunc kernel function
-#' @return DY, DX, VY, VX, CovXY, V in dictionary form
-#' @export
+# Returns DY, DX, VY, VX, CovXY, V in dictionary form
 Estimate_RDD <- function(Y, X, Z, z0, h, kerfunc, controls){
 # Get Sample Size
 n <- dim(Y)[[1]]
@@ -237,8 +235,11 @@ Perform_RobInference <- function(RDDVars, n, h, beta0, alph, H1){
 #' a significance level (default is .05), a null hypothesis value (default is 0), and an option to include standard inference approaches (default is FALSE)
 #'
 #'
-#' @param formula formula for the RD
-#' @param data dataframe containing variables
+#'
+#' @param Y dependent varaible
+#' @param X Treatment Variable
+#' @param Z Running variable that affects treatment probability
+#' @param controls Variables to control for
 #' @param threshold the threshold for the discontinuity
 #' @param bandwidth the bandwidth for the kernel
 #' @param kernel the kernel function used
@@ -248,7 +249,7 @@ Perform_RobInference <- function(RDDVars, n, h, beta0, alph, H1){
 #' @param bw_select "rdrobust" (default) for using rdbwselect from rdrobust package. "silverman" for silverman rule of thumb.
 #' @return A list object with important variables
 #' @export
-FLM <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel = NULL, alpha = .05 ,beta0 = 0, stand_inf = TRUE, bw_select = "rdrobust"){
+WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel = NULL, alpha = .05 ,beta0 = 0, stand_inf = TRUE, bw_select = "rdrobust"){
   kernel_fn = c()
   # checks
   if (!is.null(kernel)){
@@ -381,8 +382,10 @@ FLM <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel = 
 #'
 #'
 #'
-#' @param formula formula for the RD
-#' @param data dataframe containing variables
+#' @param Y dependent varaible
+#' @param X Treatment Variable
+#' @param Z Running variable that affects treatment probability
+#' @param controls Variables to control for
 #' @param threshold the threshold for the discontinuity
 #' @param bandwidths a list of bandwidths used for the kernel
 #' @param kernel the kernel function used
@@ -393,8 +396,8 @@ FLM <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel = 
 #' @param plot_stand whether the standard confidence intervals should be plotted as well
 #' @return A list object with important variables and a plot
 #' @export
-FLM_multiple_bw <- function(Y, X, Z, controls = NULL, threshold, bandwidths, kernel = "uniform", alpha = .05 ,beta0 = 0, stand_inf = TRUE, plot_bool = TRUE, plot_stand = TRUE){
-anon_func <- function(x) FLM(Y, X, Z, controls = NULL, threshold, bandwidth = x, kernel, alpha, beta0, stand_inf)
+WFRD_multiple_bw <- function(Y, X, Z, controls = NULL, threshold, bandwidths, kernel = "uniform", alpha = .05 ,beta0 = 0, stand_inf = TRUE, plot_bool = TRUE, plot_stand = TRUE){
+anon_func <- function(x) WFRD(Y, X, Z, controls = NULL, threshold, bandwidth = x, kernel, alpha, beta0, stand_inf)
 bandwidths = sort(bandwidths)
 results <- lapply(bandwidths, anon_func)
 
@@ -531,8 +534,10 @@ return(results)
 #'
 #'
 #'
-#' @param formula formula for the RD
-#' @param data dataframe containing variables
+#' @param Y dependent varaible
+#' @param X Treatment Variable
+#' @param Z Running variable that affects treatment probability
+#' @param controls Variables to control for
 #' @param threshold the threshold for the discontinuity
 #' @param bandwidths a list of bandwidths used for the kernel
 #' @param kernel the kernel function used
@@ -542,8 +547,8 @@ return(results)
 #' @param plot_bool whether a plot should be provided
 #' @return A list object with important variables and a plot
 #' @export
-FLM_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths, kernel = "uniform", alpha = .05 ,beta0 = 0, stand_inf = TRUE, plot_bool = TRUE, plot_stand = TRUE){
-  anon_func <- function(x) FLM(Y, X, Z, controls = NULL, threshold, bandwidth = x, kernel, alpha, beta0, stand_inf)
+WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths, kernel = "uniform", alpha = .05 ,beta0 = 0, stand_inf = TRUE, plot_bool = TRUE, plot_stand = TRUE){
+  anon_func <- function(x) WFRD(Y, X, Z, controls = NULL, threshold, bandwidth = x, kernel, alpha, beta0, stand_inf)
   bandwidths = sort(bandwidths)
   results <- lapply(bandwidths, anon_func)
   intervals <- tibble(
