@@ -23,7 +23,7 @@ Q <- matrix(c(sigma1, rho, rho, sigma2), 2, 2)
 D <- chol(Q)
 
 beta <- 5
-c <- 5
+c <- .5
 z0 <- 0
 rate <- -.210
 h <- n^rate

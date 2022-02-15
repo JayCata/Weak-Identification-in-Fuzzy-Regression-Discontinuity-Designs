@@ -432,10 +432,10 @@ y_max = max(c(unlist(stand_list_UB), unlist(rob_list_UB[rob_list_UB != Inf && ro
 y_max = y_max + abs(y_max) * .005
 
 if (plot_stand == TRUE){
-colors <- c("Robust" = "red", "Standard" = "blue")
+colors <- c("Robust" = "black", "Standard" = "yellow")
 line_types <- c("Robust" = 1, "Standard" = 3)
-fills <- c("Robust Interval" = "red", "Robust Real Line" = "green",
-           "Robust Half Lines" = "yellow", "Standard" = "blue")
+fills <- c("Robust Interval" = "black", "Robust Real Line" = "red",
+           "Robust Half Lines" = "blue", "Standard" = "yellow")
 } else {
   colors <- c("Robust" = "#f04546")
   line_types <- c("Robust" = 1)
