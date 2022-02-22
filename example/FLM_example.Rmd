@@ -23,7 +23,7 @@ Q <- matrix(c(sigma1, rho, rho, sigma2), 2, 2)
 D <- chol(Q)
 
 beta <- 5
-c <- .5
+c <- 5
 z0 <- 0
 rate <- -.210
 h <- n^rate
@@ -58,17 +58,21 @@ Compare SE of rdrobust and our method. When comparing, make sure that the inputs
 options(digits=20)
 print(Results["SE_Std"])
 print(result_rdrobust[["se"]][1])
+print(result_rdrobust[["bws"]][1])
 
 ```
 
 This is the plotting option that I prefer. Test it out with multiple values of c. This cannot be used without having both the bandwidths and kernel specified. This currently doesn't plot the standard inference intervals, but that is likely possible. 
 ```{r}
-standard_rate <- n ^ -.210
-subtractors <- seq(-.05, 1, length.out = 10)
+#standard_rate <- n ^ -.210
+standard_rate <- result_rdrobust[["bws"]][1]
+subtractors <- seq(-.05, .7, length.out = 10)
 bandwidths <- standard_rate + subtractors
-results <- WFRD_multiple_bw_alt(Y, X, Z, threshold = 0, bandwidths = bandwidths,  kernel = "Triangular")
+results <- WFRD_multiple_bw_alt(Y, X, Z, threshold = 0, bandwidths = bandwidths,  kernel = "Triangular", greyscale =  FALSE, plot_stand = TRUE, whisk_width = .05, plot_ref = TRUE)
 ```
-
+```{r}
+bandwidths
+```
 This is the other plotting option. It can look very bad when switching between Confidence set types but looks fine when they are consistent. This one can plot the standard inference method too. 
 ```{r}
 bandwidths <- standard_rate + subtractors

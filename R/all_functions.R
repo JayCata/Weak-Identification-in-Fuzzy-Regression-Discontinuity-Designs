@@ -1,4 +1,4 @@
-# Kernel Functions
+# Packages in use
 #' @import cowplot
 #' @import dplyr
 #' @import ggplot2
@@ -6,7 +6,7 @@
 #' @import rdrobust
 #' @import pracma
 
-
+#### Kernel Functions ####
 # Uniform Kernel Function
 Uniform_Kern <- function(Z, z0, h, return_k = FALSE){
   out <- 1/2 * (((Z-z0)/h) >= -1) * (((Z-z0)/h) <= 1)
@@ -43,11 +43,12 @@ Silverman_Kern <- function(Z, z0, h){
   second_term <- sin((abs(u)/sqrt(2)) + (pi/4))
   Ker <- first_term * second_term
 }
-
+#### Silverman Rule of Thumb ####
 srt <- function(sigma, n){
   return(((4 * sigma ^ 5)/(3 * n))^-(1/5))
 }
 
+#### OLS Function ####
 ols_w <-function(Z_reg, W, XY){
   sq_W <- sqrt(W)
   wt_Z_reg <- Z_reg * repmat(sq_W, 1, dim(Z_reg)[2])
@@ -55,11 +56,11 @@ ols_w <-function(Z_reg, W, XY){
 
   return (solve(t(wt_Z_reg) %*% wt_Z_reg) %*% t(wt_Z_reg) %*% wt_XY)
 }
-
+#### Retrieve Residuals ####
 get_resid <- function(Z_ind, Z_reg, XY, coeff){
   return(XY - Z_ind * (Z_reg %*% coeff))
 }
-
+#### Get Varaince ####
 var_thresh <- function(e_1, e_2, Z, K){
   tail_term <- solve(t(Z) %*% (repmat(K, 1, dim(Z)[2]) * Z))
   middle_term <- t(Z * repmat(K, 1, dim(Z)[2]) * repmat(e_1, 1, dim(Z)[2]))
@@ -126,7 +127,6 @@ returnlist["CovXY"] <- CovXY
 returnlist["Nminus"] <- Nminus
 returnlist["Nplus"] <- Nplus
 
-
 return (returnlist)
 }
 # Outputs - t-statistc, Reject null? (T/F), Lower Bound CI, Upper Bound CI
@@ -162,7 +162,6 @@ Perform_StandInf <- function(RDDVars, n, h, beta0, alph, H1){
   returnlist["LBCI"] <- LBCI
   returnlist["UBCI"] <- UBCI
   returnlist["SE"] <- SE
-
 
   return(returnlist)
 }
@@ -231,26 +230,26 @@ Perform_RobInference <- function(RDDVars, n, h, beta0, alph, H1){
 }
 #' Perform Robust Inference on Fuzzy RD Coefficients when identification is weak as detailed in Feir, Lemieux, Marmer (2016)
 #'
-#' This function estimates a Fuzzy RD model and performs robust inference in the case where the magnitude of the effect is small (weak identification)
-#' requires a formula, a dataframe, a threshold, a bandwidth (default is Silverman's Rule of Thumb), a kernel (defualt is Uniform),
-#' a significance level (default is .05), a null hypothesis value (default is 0), and an option to include standard inference approaches (default is FALSE)
+#' This function estimates a Fuzzy RD model and performs inference that is robust to the case where the change in treatment probability across the threshold is small (weak identification).
+#' It requires Y (dependent variable), X (a treatment variable), Z (a running variable), and a threshold. Optional arguments include bandwidth (default uses bandwidth selection method specified in bw_select), a kernel (must be given if bandwidth is given),
+#' a significance level (default is .05), a null hypothesis value (default is 0), an option to include standard inference approaches (default is TRUE), and a bw_select method (default uses rdrobust pacakge).
 #'
 #'
 #'
-#' @param Y dependent varaible
+#' @param Y Dependent variable
 #' @param X Treatment Variable
 #' @param Z Running variable that affects treatment probability
 #' @param controls Variables to control for
-#' @param threshold the threshold for the discontinuity
-#' @param bandwidth the bandwidth for the kernel
-#' @param kernel the kernel function used
-#' @param alpha the significance level
-#' @param beta0 the null hypothesis
-#' @param stand_inf whether standard inference is included or not
-#' @param bw_select "rdrobust" (default) for using rdbwselect from rdrobust package. "silverman" for silverman rule of thumb.
+#' @param threshold The threshold across which the probability of treatment changes
+#' @param bandwidth The bandwidth for the kernel
+#' @param kernel A string specifying the kernel function to use
+#' @param alpha The significance level for confidence intervals
+#' @param beta0 The null hypothesis
+#' @param stand_inf Whether standard inference is included or not
+#' @param bw_select "rdrobust" (default) for using rdbwselect from rdrobust package or "silverman" for silverman rule of thumb.
 #' @return A list object with important variables
 #' @export
-WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel = NULL, alpha = .05 ,beta0 = 0, stand_inf = TRUE, bw_select = "rdrobust"){
+WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel = NULL, alpha = .05 ,beta0 = 0, stand_inf = TRUE, bw_select = "rdrobust", plot_bw = FALSE){
   kernel_fn = c()
   # checks
   if (!is.null(kernel)){
@@ -277,11 +276,12 @@ WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel =
   X <- matrix(X)
   Z <- matrix(Z)
   n <- dim(Y)[[1]]
-
+  rdrobust_results <- list()
   # Get controls
   if (!is.null(controls)){
   controls <- matrix(controls)
   }
+
   # Bandwidth and Kernel need to be determined
   if (is.null(bandwidth) && is.null(kernel)){
     if (bw_select == "silverman"){
@@ -305,13 +305,13 @@ WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel =
         rdrobust_results = rdbwselect(Y, Z, c = threshold, fuzzy = X, covs = controls, vce = "hc0")
         bandwidth = rdrobust_results["bws"][[1]][1,1]
         if (rdrobust_results['kernel'] == "Triangular"){
-          kernel <- Triangular_Kern
+          kernel_fn <- Triangular_Kern
         }
         if (rdrobust_results['kernel'] == "Uniform"){
-          kernel <- Uniform_Kern
+          kernel_fn <- Uniform_Kern
         }
         if (rdrobust_results['kernel'] == "Epanechnikov"){
-          kernel <- Epanechnikov_Kern
+          kernel_fn <- Epanechnikov_Kern
         }
       } else
       {stop (paste(bw_select, " not a valid bandwidth selection method"))}
@@ -342,7 +342,11 @@ WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel =
       {stop (paste(bw_select, " not a valid bandwidth selection method"))}
     }
   }
-
+  if (plot_bw){
+    kernel <- rdrobust_results['kernel']
+    return_list <- list(bandwidth, kernel)
+    return(return_list)
+  }
   # Perform estimate and inference
   RDDVars <- Estimate_RDD(Y, X, Z, threshold, bandwidth, kernel_fn, controls)
   StandardInference <- Perform_StandInf(RDDVars, n, bandwidth, beta0, alpha, "N")
@@ -544,12 +548,30 @@ return(results)
 #' @param kernel the kernel function used
 #' @param alpha the significance level
 #' @param beta0 the null hypothesis
-#' @param stand_inf whether standard inference is included or not
-#' @param plot_bool whether a plot should be provided
+#' @param plot_stand whether to plot the standard interval or not
+#' @param greyscale if TRUE, plot in greyscale
+#' @param whisk_width width of whiskers of error bars to adjust for finer bandwidth grids
+#' @param plot_ref whether plot should plot a vertical line where rdrobust chooses BW
 #' @return A list object with important variables and a plot
 #' @export
-WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths, kernel = "uniform", alpha = .05 ,beta0 = 0, stand_inf = TRUE, plot_bool = TRUE, plot_stand = TRUE){
-  anon_func <- function(x) WFRD(Y, X, Z, controls = NULL, threshold, bandwidth = x, kernel, alpha, beta0, stand_inf)
+WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold=NULL, bandwidths=NULL, kernel = "uniform", alpha = .05 ,beta0 = 0, plot_stand = TRUE, greyscale = FALSE, whisk_width = .1, plot_ref = FALSE){
+  # define necessary components as matrices in case they are provided as dataframe columns.
+  Y <- matrix(Y)
+  X <- matrix(X)
+  Z <- matrix(Z)
+  n <- dim(Y)[[1]]
+
+  # Get controls
+  if (!is.null(controls)){
+    controls <- matrix(controls)
+  }
+  ref_list <- list()
+  # Get bwselect terms to reference or use for list of bandwidths construction
+  if(plot_ref == TRUE){
+  ref_list <- WFRD(Y, X, Z, controls, threshold, bandwidth = NULL, kernel = kernel, alpha = .05 ,beta0 = 0, stand_inf = TRUE, bw_select = "rdrobust", plot_bw = TRUE)
+  }
+  anon_func <- function(x) WFRD(Y, X, Z, controls = NULL, threshold, bandwidth = x, kernel, alpha, beta0, TRUE)
+
   bandwidths = sort(bandwidths)
   results <- lapply(bandwidths, anon_func)
   intervals <- tibble(
@@ -572,8 +594,17 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths
     bandwidth = numeric(),
     point_estimate = numeric()
   )
+  standard <- tibble(
+    bandwidth = numeric(),
+    point_estimate = numeric(),
+    lower = numeric(),
+    upper = numeric()
+  )
+  ref_bw <- tibble(
+    x_int = numeric()
+  )
   y_list <- list()
-
+  # Get Tibbles for each type of interval
   for (j in 1:length(results)){
     if (results[[j]][["CStype"]] == "Interval"){
       intervals <- intervals %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]], lower = results[[j]][["L_Bound_Rob"]], upper = results[[j]][["U_Bound_Rob"]])
@@ -597,6 +628,11 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
     }
+    if (plot_stand == TRUE){
+      standard <- standard %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]], lower = results[[j]][["L_Bound_Std"]], upper = results[[j]][["U_Bound_Std"]])
+      y_list <- append(y_list, list(results[[j]][["L_Bound_Std"]]))
+      y_list <- append(y_list, list(results[[j]][["U_Bound_Std"]]))
+    }
   }
   ymax <- max(unlist(y_list))
   ymin <- min(unlist(y_list))
@@ -609,12 +645,12 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths
 
   if (nrow(intervals) > 0){
     plt <- plt + geom_point(data = intervals, mapping = aes(x = bandwidth, y = point_estimate, color = "Interval"))
-    plt <- plt + geom_errorbar(data = intervals, aes(x = bandwidth, ymin = lower, ymax = upper, color = "Interval"), width = .1)
+    plt <- plt + geom_errorbar(data = intervals, aes(x = bandwidth, ymin = lower, ymax = upper, color = "Interval"), width = whisk_width)
   }
   if (nrow(halflines) > 0){
     plt <- plt +  geom_point(data = halflines, aes(x = bandwidth, y = point_estimate, color = "Half Lines"))
-    plt <- plt + geom_errorbar(data = halflines, aes(x = bandwidth, ymin = lower, ymax = lower, color = "Half Lines"), width = .1)
-    plt <- plt + geom_errorbar(data = halflines, aes(x = bandwidth, ymin = upper, ymax = upper, color = "Half Lines"), width = .1)
+    plt <- plt + geom_errorbar(data = halflines, aes(x = bandwidth, ymin = lower, ymax = lower, color = "Half Lines"), width = whisk_width)
+    plt <- plt + geom_errorbar(data = halflines, aes(x = bandwidth, ymin = upper, ymax = upper, color = "Half Lines"), width = whisk_width)
     plt <- plt + geom_segment(data = halflines, aes(x = bandwidth, xend = bandwidth, y = lower, yend = Inf, color = "Half Lines"))
     plt <- plt + geom_segment(data = halflines, aes(x = bandwidth, xend = bandwidth, y = -Inf,  yend = upper, color = "Half Lines"))
   }
@@ -626,13 +662,38 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold, bandwidths
     plt <- plt +  geom_point(data = empties, aes(x = bandwidth, y = point_estimate, color = "Empty"))
   }
   colors <- c("Interval" = "black", "Half Lines" = "blue", "Real Line" = "red", "Empty" = "green")
+  if (plot_stand == TRUE){
 
+    plt <- plt + geom_ribbon(data = standard, aes(x = bandwidth, ymin = lower, ymax = upper,  fill = "Confidence Interval"), alpha = .5)
+
+  }
+
+  if (plot_stand == TRUE && greyscale == FALSE){
   plt <- plt + scale_x_continuous(labels = scaleFUN) +
         scale_y_continuous(labels = scaleFUN, expand = c(0,0), limits = c(ymin, ymax)) +
         ggtitle("Confidence Sets by Bandwidth") +
-        ylab("Estimate") + xlab("Bandwidth") + theme_cowplot(12) +  labs(x = "Bandwidth", y = "Estimate", color = "Confidence Set Type") + scale_color_manual(values = colors)
+        ylab("Estimate") + xlab("Bandwidth") + theme_cowplot(12) +  labs(x = "Bandwidth", y = "Estimate", color = "Robust Confidence Set Types", fill = "Standard Inference") + scale_color_manual(values = colors) + scale_fill_manual(values = c("Confidence Interval" = "blanchedalmond"))
+  } else if (plot_stand == FALSE && greyscale == FALSE) {
+    plt <- plt + scale_x_continuous(labels = scaleFUN) +
+      scale_y_continuous(labels = scaleFUN, expand = c(0,0), limits = c(ymin, ymax)) +
+      ggtitle("Confidence Sets by Bandwidth") +
+      ylab("Estimate") + xlab("Bandwidth") + theme_cowplot(12) +  labs(x = "Bandwidth", y = "Estimate", color = "Confidence Set Type") + scale_color_manual(values = colors)
+  } else if (plot_stand == TRUE && greyscale == TRUE){
+    plt <- plt + scale_x_continuous(labels = scaleFUN) +
+      scale_y_continuous(labels = scaleFUN, expand = c(0,0), limits = c(ymin, ymax)) +
+      ggtitle("Confidence Sets by Bandwidth") +
+      ylab("Estimate") + xlab("Bandwidth") + theme_cowplot(12) +  labs(x = "Bandwidth", y = "Estimate", color = "Robust Confidence Set Types", fill = "Standard Inference") +  scale_color_grey() + scale_fill_manual(values = c("Confidence Interval" = "grey"))
+  } else if (plot_stand == FALSE && greyscale == TRUE){
+    plt <- plt + scale_x_continuous(labels = scaleFUN) +
+      scale_y_continuous(labels = scaleFUN, expand = c(0,0), limits = c(ymin, ymax)) +
+      ggtitle("Confidence Sets by Bandwidth") +
+      ylab("Estimate") + xlab("Bandwidth") + theme_cowplot(12) +  labs(x = "Bandwidth", y = "Estimate", color = "Robust Confidence Set Types", fill = "Standard Inference") + scale_color_grey()
+  }
 
-
+  if (ref_list[[1]]< bandwidths[[length(bandwidths)]] && ref_list[[1]] > bandwidths[[1]] && plot_ref == TRUE){
+    ref_bw <- ref_bw %>% add_row(x_int = ref_list[[1]])
+    plt <- plt +  geom_vline(data = ref_bw, aes(xintercept = x_int), linetype = "longdash", color = "black", alpha = .6)
+  }
   show(plt)
   return(results)
 }
