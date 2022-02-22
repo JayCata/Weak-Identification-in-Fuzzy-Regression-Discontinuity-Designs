@@ -48,6 +48,12 @@ Here we are running the rdrobust package to compare SEs.
 result_rdrobust <- rdrobust(Y, Z, c = z0, fuzzy = X, vce = "hc0",  kernel = "tri")
 ```
 
+Bandwidth selected by Cattaneo:
+```{r}
+result_rdrobust["bws"][[1]][1,1]
+```
+
+
 This is just a single result from package. If bandwidth is specified, the kernel must be as well. The kernel can be specified without a bandwidth and rdrobus can find the appropriate bandwidth.
 ```{r}
 Results <- WFRD(Y, X, Z, threshold = 0, stand_inf = TRUE, kernel = "Triangular")
@@ -63,6 +69,7 @@ print(result_rdrobust[["bws"]][1])
 ```
 
 This is the plotting option that I prefer. Test it out with multiple values of c. This cannot be used without having both the bandwidths and kernel specified. This currently doesn't plot the standard inference intervals, but that is likely possible. 
+
 ```{r}
 #standard_rate <- n ^ -.210
 standard_rate <- result_rdrobust[["bws"]][1]
@@ -76,7 +83,7 @@ bandwidths
 This is the other plotting option. It can look very bad when switching between Confidence set types but looks fine when they are consistent. This one can plot the standard inference method too. 
 ```{r}
 bandwidths <- standard_rate + subtractors
-results <- WFRD_multiple_bw(Y, X, Z, threshold = 0, bandwidths = bandwidths,  kernel = "Triangular")
+results <- WFRD_multiple_bw(Y, X, Z, threshold = 0, bandwidths = bandwidths,  kernel = "Triangular",plot_stand = FALSE)
 ```
 
 
