@@ -60,12 +60,13 @@ ols_w <-function(Z_reg, W, XY){
 get_resid <- function(Z_ind, Z_reg, XY, coeff){
   return(XY - Z_ind * (Z_reg %*% coeff))
 }
-#### Get Varaince ####
-var_thresh <- function(e_1, e_2, Z, K){
-  tail_term <- solve(t(Z) %*% (repmat(K, 1, dim(Z)[2]) * Z))
-  middle_term <- t(Z * repmat(K, 1, dim(Z)[2]) * repmat(e_1, 1, dim(Z)[2]))
-  middle_term <- middle_term %*% (repmat(e_2, 1, dim(Z)[2]) * repmat(K, 1, dim(Z)[2]) * Z)
-  return((tail_term %*% middle_term %*% tail_term)[[1,1]])
+#### Get Variance ####
+var_thresh <- function(e_1, e_2, Z_1, Z_2, K){
+  tail_term_1<- solve(t(Z_1) %*% (repmat(K, 1, dim(Z_1)[2]) * Z_1))
+  tail_term_2<- solve(t(Z_2) %*% (repmat(K, 1, dim(Z_2)[2]) * Z_2))
+  middle_term <- t(Z_1 * repmat(K, 1, dim(Z_1)[2]) * repmat(e_1, 1, dim(Z_1)[2]))
+  middle_term <- middle_term %*% (repmat(e_2, 1, dim(Z_2)[2]) * repmat(K, 1, dim(Z_2)[2]) * Z_2)
+  return((tail_term_1 %*% middle_term %*% tail_term_2)[[1,1]])
 }
 
 # Returns DY, DX, VY, VX, CovXY, V in dictionary form
@@ -74,40 +75,42 @@ Estimate_RDD <- function(Y, X, Z, z0, h, kerfunc, controls){
 n <- dim(Y)[[1]]
 
 # Add Constant Column for Intercept
-Z_reg <- cbind(matrix(1, n, 1), (Z-z0))
-
+Z_reg_Y <- cbind(matrix(1, n, 1), (Z-z0))
+Z_reg_X <- cbind(matrix(1, n, 1), (Z-z0))
 # Define Variables for Kernel
 Zminus <- (Z <= z0)
 Zplus <- (Z > z0)
 Ker <- kerfunc(Z, z0, h)
 Wminus <- Ker * Zminus
 Wplus <- Ker * Zplus
-
+if (!is.null(controls)){
+ Z_reg_Y = cbind(Z_reg_Y, controls)
+}
 # Get Y\X plus\minus (make a function)
-Yplus <- ols_w(Z_reg, Wplus, Y)
-Yminus <- ols_w(Z_reg, Wminus, Y)
-Xplus <- ols_w(Z_reg, Wplus, X)
-Xminus <- ols_w(Z_reg, Wminus, X)
+Yplus <- ols_w(Z_reg_Y, Wplus, Y)
+Yminus <- ols_w(Z_reg_Y, Wminus, Y)
+Xplus <- ols_w(Z_reg_X, Wplus, X)
+Xminus <- ols_w(Z_reg_X, Wminus, X)
 
 DY <- Yplus[[1]] - Yminus[[1]]
 DX <- Xplus[[1]] - Xminus[[1]]
 
 #Variance and Covariance
 #Residuals
-eY_minus <- get_resid(Zminus, Z_reg, Y, Yminus)
-eY_plus <- get_resid(Zplus, Z_reg, Y, Yplus)
-eX_minus <- get_resid(Zminus, Z_reg, X, Xminus)
-eX_plus <- get_resid(Zplus, Z_reg, X, Xplus)
+eY_minus <- get_resid(Zminus, Z_reg_Y, Y, Yminus)
+eY_plus <- get_resid(Zplus, Z_reg_Y, Y, Yplus)
+eX_minus <- get_resid(Zminus, Z_reg_X, X, Xminus)
+eX_plus <- get_resid(Zplus, Z_reg_X, X, Xplus)
 
 Nminus <- sum(Zminus)
 Nplus <- sum(Zplus)
 
-VYminus <- var_thresh(eY_minus, eY_minus, Z_reg, Wminus)
-VYplus <- var_thresh(eY_plus, eY_plus, Z_reg, Wplus)
-VXminus <- var_thresh(eX_minus, eX_minus, Z_reg, Wminus)
-VXplus <- var_thresh(eX_plus, eX_plus, Z_reg, Wplus)
-Covminus <- var_thresh(eY_minus, eX_minus, Z_reg, Wminus)
-Covplus <- var_thresh(eY_plus, eX_plus, Z_reg, Wplus)
+VYminus <- var_thresh(eY_minus, eY_minus, Z_reg_Y, Z_reg_Y, Wminus)
+VYplus <- var_thresh(eY_plus, eY_plus, Z_reg_Y, Z_reg_Y, Wplus)
+VXminus <- var_thresh(eX_minus, eX_minus, Z_reg_X, Z_reg_X, Wminus)
+VXplus <- var_thresh(eX_plus, eX_plus, Z_reg_X, Z_reg_X, Wplus)
+Covminus <- var_thresh(eY_minus, eX_minus, Z_reg_Y, Z_reg_X, Wminus)
+Covplus <- var_thresh(eY_plus, eX_plus, Z_reg_Y, Z_reg_X, Wplus)
 
 #Final Variance\Covariance Values
 VY <-  (VYplus + VYminus)
@@ -348,6 +351,7 @@ WFRD <- function(Y, X, Z, controls = NULL, threshold, bandwidth = NULL, kernel =
     return(return_list)
   }
   # Perform estimate and inference
+
   RDDVars <- Estimate_RDD(Y, X, Z, threshold, bandwidth, kernel_fn, controls)
   StandardInference <- Perform_StandInf(RDDVars, n, bandwidth, beta0, alpha, "N")
   RobustInference <- Perform_RobInference(RDDVars, n, bandwidth, beta0, alpha, "N")
@@ -604,12 +608,14 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold=NULL, bandw
     x_int = numeric()
   )
   y_list <- list()
+  colors <- list()
   # Get Tibbles for each type of interval
   for (j in 1:length(results)){
     if (results[[j]][["CStype"]] == "Interval"){
       intervals <- intervals %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]], lower = results[[j]][["L_Bound_Rob"]], upper = results[[j]][["U_Bound_Rob"]])
       y_list <- append(y_list, list(results[[j]][["L_Bound_Rob"]]))
       y_list <- append(y_list, list(results[[j]][["U_Bound_Rob"]]))
+      colors <- append(colors, list("Interval" = "black"))
     }
     else if (results[[j]][["CStype"]] == "Half Lines"){
       halflines <- halflines %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]], lower = results[[j]][["L_Bound_Rob"]], upper = results[[j]][["U_Bound_Rob"]])
@@ -617,16 +623,19 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold=NULL, bandw
       y_list <- append(y_list, list(results[[j]][["U_Bound_Rob"]]))
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
+      colors <- append(colors, list("Half Lines" = "blue"))
     }
     else if (results[[j]][["CStype"]] == "Real Line"){
       reallines <- reallines %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]])
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
+      colors <- append(colors, list("Real Line" = "red"))
     }
     else if (results[[j]][["CStype"]] == "Empty"){
       empties <- empties %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]])
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
       y_list <- append(y_list, list(results[[j]][["Estimate"]]))
+      colors <- append(colors, list("Empty" = "green"))
     }
     if (plot_stand == TRUE){
       standard <- standard %>% add_row(bandwidth = bandwidths[[j]], point_estimate = results[[j]][["Estimate"]], lower = results[[j]][["L_Bound_Std"]], upper = results[[j]][["U_Bound_Std"]])
@@ -641,7 +650,7 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold=NULL, bandw
   ymin <- ymin * (ymin <= 0) * 1.1 + ymin * (ymin > 0) * .9
 
   scaleFUN <- function(x) sprintf("%.2f", x)
-  plt <- ggplot()
+  plt <- ggplot() + coord_cartesian(clip = "off")
 
   if (nrow(intervals) > 0){
     plt <- plt + geom_point(data = intervals, mapping = aes(x = bandwidth, y = point_estimate, color = "Interval"))
@@ -661,7 +670,8 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold=NULL, bandw
   if (nrow(empties) > 0){
     plt <- plt +  geom_point(data = empties, aes(x = bandwidth, y = point_estimate, color = "Empty"))
   }
-  colors <- c("Interval" = "black", "Half Lines" = "blue", "Real Line" = "red", "Empty" = "green")
+
+
   if (plot_stand == TRUE){
 
     plt <- plt + geom_ribbon(data = standard, aes(x = bandwidth, ymin = lower, ymax = upper,  fill = "Confidence Interval"), alpha = .5)
@@ -692,7 +702,7 @@ WFRD_multiple_bw_alt <- function(Y, X, Z, controls = NULL, threshold=NULL, bandw
 
   if (ref_list[[1]]< bandwidths[[length(bandwidths)]] && ref_list[[1]] > bandwidths[[1]] && plot_ref == TRUE){
     ref_bw <- ref_bw %>% add_row(x_int = ref_list[[1]])
-    plt <- plt +  geom_vline(data = ref_bw, aes(xintercept = x_int), linetype = "longdash", color = "black", alpha = .6)
+    plt <- plt +  geom_vline(data = ref_bw, aes(xintercept = x_int), linetype = "longdash", color = "black", alpha = .6) +  annotate("text", x = ref_list[[1]], y = ymin, ,label = "rdrobust", size = 3, angle = 90)
   }
   show(plt)
   return(results)

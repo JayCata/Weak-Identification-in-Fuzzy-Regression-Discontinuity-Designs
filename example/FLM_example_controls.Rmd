@@ -39,7 +39,8 @@ eps <- matrix(rnorm(n, mean = 0, sd = 1), n, 1)
 alpha <- (W[, 1])
 u <- (W[, 2])
 X <- matrix((u < 0) * (Z<=z0) + (u < c) * (Z > z0))
-Y <- matrix(alpha + X %*% beta + eps)
+control = matrix(rnorm(n ,mean = 1, sd = 2), n, 1)
+Y <- matrix(alpha + X %*% beta + control + eps)
 ```
 
 
