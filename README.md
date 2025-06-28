@@ -1,0 +1,1 @@
+This code contains functions to estimate regression discontinuities and implements the inference procedures found in [Weak Identification in Fuzzy Regression Discontinuity Designs](https://economics.ubc.ca/wp-content/uploads/sites/38/2018/12/pdf_paper_thomas-lemieux-fuzzy.pdf) by Feir, Lemieux, and Marmer.
